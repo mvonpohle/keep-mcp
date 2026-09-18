@@ -93,6 +93,40 @@ The server reads the token file first and falls back to the `GOOGLE_MASTER_TOKEN
 
 > **Note:** set `UNSAFE_MODE=true` in your environment (or in the compose file) if you want to modify notes without the `keep-mcp` label.
 
+#### Bitwarden secret management
+
+If you keep the master token in Bitwarden, the cleanest hand-off is a **Podman secret**: it is mounted at `/run/secrets/<name>` inside the container, which matches the server's default `GOOGLE_MASTER_TOKEN_FILE` (`/run/secrets/google_master_token`) — no extra configuration needed.
+
+```bash
+# One-time: pull the token from Bitwarden into podman's secret store
+bw get password "google-master-token" | podman secret create google_master_token -
+
+# Run (or add --secret google_master_token to your quadlet .container file)
+podman run --rm -i --secret google_master_token -e GOOGLE_EMAIL=you@example.com keep-mcp
+```
+
+The `bw` CLI needs your vault unlocked, so for unattended starts (e.g. a systemd unit at boot) use **Bitwarden Secrets Manager** (`bws`) instead — it's built for machine-to-machine access via a service-account token:
+
+```ini
+# ~/.config/systemd/user/keep-mcp.service
+[Service]
+EnvironmentFile=%h/.config/keep-mcp/bws.env   # contains BWS_ACCESS_TOKEN=..., chmod 600
+# Refresh the podman secret from Bitwarden before each start.
+# The leading "-" ignores the error when the secret doesn't exist yet.
+ExecStartPre=-/usr/bin/podman secret rm google_master_token
+ExecStartPre=/usr/bin/bash -c 'bws secret get <secret-id> | jq -r ".value // ." | podman secret create google_master_token -'
+ExecStart=/usr/bin/podman run --rm -i --name keep-mcp --secret google_master_token -e GOOGLE_EMAIL=you@example.com keep-mcp
+```
+
+Then `systemctl --user daemon-reload && systemctl --user enable --now keep-mcp.service` (plus `loginctl enable-linger $USER` if it should start at boot without a login session).
+
+With plain Docker instead of Podman, the simplest equivalent is passing the token straight from `bw` as an environment variable — the server falls back to `GOOGLE_MASTER_TOKEN` when no token file is present:
+
+```bash
+GOOGLE_MASTER_TOKEN=$(bw get password "google-master-token") \
+  docker run --rm -i -e GOOGLE_MASTER_TOKEN -e GOOGLE_EMAIL=you@example.com keep-mcp
+```
+
 #### Plain `docker run` (without Compose)
 
 Build the image from the repo root:
