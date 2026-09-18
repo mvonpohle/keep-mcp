@@ -6,7 +6,7 @@
 # host (see TOKEN_FILE_HOST) is mounted read-only at /run/secrets/ inside the
 # container, which matches the server's default GOOGLE_MASTER_TOKEN_FILE.
 #
-# Configuration lives in a .env file next to this file (see .env.example):
+# Configuration lives in a .env file next to this file (see .example.env):
 #   GOOGLE_EMAIL     - your Google account email
 #   TOKEN_FILE_HOST  - absolute path to the file holding your master token,
 #                      e.g. /home/you/.config/keep-mcp/google_master_token (chmod 600)
@@ -18,7 +18,7 @@ services:
     # stdio transport: keep stdin open so the MCP client can talk to the server
     stdin_open: true
     environment:
-      GOOGLE_EMAIL: ${GOOGLE_EMAIL:?Set GOOGLE_EMAIL in your .env file (see .env.example)}
+      GOOGLE_EMAIL: ${GOOGLE_EMAIL:?Set GOOGLE_EMAIL in your .env file (see .example.env)}
       # Set to "true" to allow modifying notes without the keep-mcp label
       UNSAFE_MODE: ${UNSAFE_MODE:-false}
     secrets:
@@ -27,4 +27,4 @@ services:
 
 secrets:
   google_master_token:
-    file: ${TOKEN_FILE_HOST:?Set TOKEN_FILE_HOST in your .env file (see .env.example)}
+    file: ${TOKEN_FILE_HOST:?Set TOKEN_FILE_HOST in your .env file (see .example.env)}

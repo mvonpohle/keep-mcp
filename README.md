@@ -80,11 +80,11 @@ Then point your MCP client at Compose. The client spawns a fresh container per s
 
 (Use an absolute path for `TOKEN_FILE_HOST` — `~` is not expanded. Compose mounts it read-only at `/run/secrets/google_master_token`, which the server reads by default. To use a different in-container path, change the secret's `target:` and set `GOOGLE_MASTER_TOKEN_FILE` under `environment:` to match.)
 
-Or run it by hand — put the settings in a `.env` file next to `docker-compose.yml` (see `.env.example`); Compose picks it up automatically:
+Or run it by hand — put the settings in a `.env` file next to `docker-compose.yml` (see `.example.env`); Compose picks it up automatically:
 
 ```bash
 cd /path/to/keep-mcp
-cp .env.example .env  # then edit .env with your email and token file path
+cp .example.env .env  # then edit .env with your email and token file path
 docker compose run --rm keep-mcp
 ```
 
