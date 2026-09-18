@@ -35,18 +35,13 @@
 # in its own chmod-600 file and point BWS_TOKEN_FILE at it (BWS_TOKEN_FILE
 # itself may live in .env).
 #
-# Any extra arguments are passed through to `<runtime> run` (before the image),
-# so this works both for stdio launches and for daemon mode once a network
-# transport exists:
+# Any extra arguments are passed through to `<runtime> run` (before the image).
 #
 #   # 1. cp .example.env .env, then fill in GOOGLE_EMAIL, BWS_SECRET_ID,
 #   #    and BWS_TOKEN_FILE (pointing at your chmod-600 access-token file).
 #   # 2. Build the image from the repo root, e.g.: podman build -t keep-mcp .
 #   # 3. stdio — have your MCP client run this script:
 #   ./scripts/run-with-bitwarden.sh --rm -i
-#
-#   # daemon (for a future Streamable HTTP transport):
-#   ./scripts/run-with-bitwarden.sh -d --name keep-mcp -p 127.0.0.1:8080:8080
 
 set -euo pipefail
 
@@ -71,23 +66,11 @@ need "$CONTAINER_RUNTIME"
 need bws
 need jq
 
-# Preflight: fail fast with a useful message if the runtime itself can't start.
-# Without this, a broken rootless setup only surfaces later as a cryptic
-# `jq: Broken pipe` when the token-fetch pipeline collapses.
+# Preflight: fail fast if the runtime itself can't start — otherwise a broken
+# setup only surfaces later as a cryptic `jq: Broken pipe` when the
+# token-fetch pipeline collapses.
 if ! "$CONTAINER_RUNTIME" info >/dev/null 2>&1; then
-  echo "error: '$CONTAINER_RUNTIME info' failed — $CONTAINER_RUNTIME isn't usable here." >&2
-  if [[ "$CONTAINER_RUNTIME" == "podman" ]]; then
-    cat >&2 <<EOF
-The usual cause is missing subordinate UID/GID ranges (newuidmap: Operation not permitted):
-  check: grep -E '^$USER:' /etc/subuid /etc/subgid
-  fix (as root): usermod --add-subuids 100000-165535 --add-subgids 100000-165535 $USER
-Inside a Proxmox LXC container you may also need 'features: nesting=1',
-/dev/net/tun, and idmap entries for the subuid range in the container config
-on the Proxmox host.
-EOF
-  else
-    echo "Is the Docker daemon running and is your user allowed to talk to it?" >&2
-  fi
+  echo "error: '$CONTAINER_RUNTIME info' failed — $CONTAINER_RUNTIME isn't usable in this environment." >&2
   exit 1
 fi
 
