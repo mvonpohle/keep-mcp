@@ -11,27 +11,35 @@
 #
 # Requirements: podman, bws (Bitwarden Secrets Manager CLI), jq.
 #
-# Environment:
+# Environment (each may be exported, or set in the .env file — see below):
 #   GOOGLE_EMAIL      your Google account email (required)
 #   BWS_SECRET_ID     Bitwarden Secrets Manager secret ID holding the master token (required)
 #   BWS_ACCESS_TOKEN  service-account access token, or...
 #   BWS_TOKEN_FILE    ...path to a file containing it, e.g. ~/.config/keep-mcp/bws-token (chmod 600)
+#   ENV_FILE          path to the .env file (default: .env in the repo root)
 #   SECRET_NAME       Podman secret name (default: google_master_token — matches
 #                     the server's default GOOGLE_MASTER_TOKEN_FILE)
 #   IMAGE             container image (default: keep-mcp:latest; build it first
 #                     with: podman build -t keep-mcp .)
 #
+# Configuration: put GOOGLE_EMAIL and BWS_SECRET_ID in the repo's .env file
+# (see .example.env) — the script reads it for anything not already exported.
+# The secret ID is only an identifier, so .env is a fine home for it.
+# Keep BWS_ACCESS_TOKEN itself out of .env and out of shell history: store it
+# in its own chmod-600 file and point BWS_TOKEN_FILE at it (BWS_TOKEN_FILE
+# itself may live in .env).
+#
 # Any extra arguments are passed through to `podman run` (before the image),
 # so this works both for stdio launches and for daemon mode once a network
 # transport exists:
 #
-#   # stdio — have your MCP client run this script:
-#   GOOGLE_EMAIL=you@example.com BWS_SECRET_ID=<id> BWS_TOKEN_FILE=~/.config/keep-mcp/bws-token \
-#     ./scripts/run-with-bitwarden.sh --rm -i
+#   # 1. cp .example.env .env, then fill in GOOGLE_EMAIL, BWS_SECRET_ID,
+#   #    and BWS_TOKEN_FILE (pointing at your chmod-600 access-token file).
+#   # 2. stdio — have your MCP client run this script:
+#   ./scripts/run-with-bitwarden.sh --rm -i
 #
 #   # daemon (for a future Streamable HTTP transport):
-#   GOOGLE_EMAIL=you@example.com BWS_SECRET_ID=<id> BWS_TOKEN_FILE=~/.config/keep-mcp/bws-token \
-#     ./scripts/run-with-bitwarden.sh -d --name keep-mcp -p 127.0.0.1:8080:8080
+#   ./scripts/run-with-bitwarden.sh -d --name keep-mcp -p 127.0.0.1:8080:8080
 
 set -euo pipefail
 
@@ -41,6 +49,27 @@ need() {
 need podman
 need bws
 need jq
+
+# Load the repo's .env file for anything not already exported, so GOOGLE_EMAIL
+# and BWS_SECRET_ID can live in the same .env the compose flow uses.
+# Explicitly exported variables always win over the file.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/../.env}"
+if [[ -f "$ENV_FILE" ]]; then
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line#"${line%%[![:space:]]*}"}"            # strip leading whitespace
+    [[ -z "$line" || "$line" == \#* || "$line" != *=* ]] && continue
+    key="${line%%=*}"; key="${key//[[:space:]]/}"
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    if [[ -z "${!key:-}" ]]; then
+      val="${line#*=}"
+      if [[ "$val" =~ ^\'(.*)\'$ ]]; then val="${BASH_REMATCH[1]}"
+      elif [[ "$val" =~ ^\"(.*)\"$ ]]; then val="${BASH_REMATCH[1]}"; fi
+      printf -v "$key" '%s' "$val"
+      export "$key"
+    fi
+  done < "$ENV_FILE"
+fi
 
 : "${GOOGLE_EMAIL:?Set GOOGLE_EMAIL to your Google account email}"
 : "${BWS_SECRET_ID:?Set BWS_SECRET_ID to the Bitwarden Secrets Manager secret ID}"
