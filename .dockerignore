@@ -1,0 +1,27 @@
+# Version control
+.git
+.github
+
+# Python bytecode and packaging artefacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+
+# Test, lint and coverage caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Local secrets and evidence captures (never bake these into the image)
+.env
+.env.*
+testing-evidence/

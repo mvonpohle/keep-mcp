@@ -46,7 +46,76 @@ Or with `uvx`:
 2. Add your credentials:
 
 * `GOOGLE_EMAIL`: Your Google account email address
-* `GOOGLE_MASTER_TOKEN`: Your Google account master token
+* `GOOGLE_MASTER_TOKEN`: Your Google account master token (or `GOOGLE_MASTER_TOKEN_FILE` pointing to a file containing it — see the Docker section below)
+
+### Docker
+
+Build the image from the repo root:
+
+```bash
+docker build -t keep-mcp .
+```
+
+Then add it to your MCP client config. The client spawns the container and talks to it over stdio (the `-i` flag is required):
+
+```json
+"mcpServers": {
+  "keep-mcp-docker": {
+    "command": "docker",
+    "args": [
+      "run", "--rm", "-i",
+      "-e", "GOOGLE_EMAIL",
+      "-e", "GOOGLE_MASTER_TOKEN",
+      "keep-mcp"
+    ],
+    "env": {
+      "GOOGLE_EMAIL": "you@example.com",
+      "GOOGLE_MASTER_TOKEN": "your-master-token"
+    }
+  }
+}
+```
+
+> **Note:** `UNSAFE_MODE=true` can be passed as an extra `-e UNSAFE_MODE` argument if you want to modify notes without the `keep-mcp` label.
+
+#### Passing the token as a secret file (recommended)
+
+Instead of `GOOGLE_MASTER_TOKEN`, you can mount the token as a file. The server reads the path in `GOOGLE_MASTER_TOKEN_FILE` first (default `/run/secrets/google_master_token`) and falls back to the `GOOGLE_MASTER_TOKEN` environment variable when the file is missing or empty.
+
+`/run` does not exist on macOS and is usually not writable by a regular Linux user, so keep the token in a user-owned file and bind-mount it into the container:
+
+```bash
+# One-time setup: store the token with owner-only permissions
+mkdir -p "$HOME/.config/keep-mcp"
+printf '%s' 'your-master-token' > "$HOME/.config/keep-mcp/google_master_token"
+chmod 600 "$HOME/.config/keep-mcp/google_master_token"
+```
+
+```json
+"mcpServers": {
+  "keep-mcp-docker": {
+    "command": "docker",
+    "args": [
+      "run", "--rm", "-i",
+      "-e", "GOOGLE_EMAIL=you@example.com",
+      "-v", "/home/you/.config/keep-mcp/google_master_token:/run/secrets/google_master_token:ro",
+      "keep-mcp"
+    ]
+  }
+}
+```
+
+(Replace `/home/you/...` with the absolute path to your token file — `~` is not expanded in volume arguments passed without a shell.)
+
+To use a different in-container path, set `GOOGLE_MASTER_TOKEN_FILE`:
+
+```bash
+docker run --rm -i \
+  -e GOOGLE_EMAIL=you@example.com \
+  -e GOOGLE_MASTER_TOKEN_FILE=/secrets/keep_token \
+  -v "$HOME/.config/keep-mcp/google_master_token:/secrets/keep_token:ro" \
+  keep-mcp
+```
 
 ### Obtain a Google master token
 
