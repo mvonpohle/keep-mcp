@@ -6,7 +6,32 @@ from dotenv import load_dotenv
 
 KEEP_MCP_LABEL = "keep-mcp"
 
+# Default location of the file holding the Google master token (e.g. a Docker
+# secret or a bind-mounted file). Override with GOOGLE_MASTER_TOKEN_FILE.
+DEFAULT_MASTER_TOKEN_FILE = "/run/secrets/google_master_token"
+
 _keep_client = None
+
+
+def _master_token_file():
+    """Return the configured path of the master-token secret file."""
+    return os.getenv("GOOGLE_MASTER_TOKEN_FILE", DEFAULT_MASTER_TOKEN_FILE)
+
+
+def _read_master_token():
+    """
+    Return the Google master token.
+
+    A token file takes precedence over the GOOGLE_MASTER_TOKEN environment
+    variable. If the file is missing or empty, fall back to the env var.
+    """
+    token_file = _master_token_file()
+    if token_file and os.path.isfile(token_file):
+        with open(token_file, encoding="utf-8") as handle:
+            file_token = handle.read().strip()
+        if file_token:
+            return file_token
+    return os.getenv("GOOGLE_MASTER_TOKEN")
 
 def get_client():
     """
@@ -24,12 +49,16 @@ def get_client():
     # Load environment variables
     load_dotenv()
     
-    # Get credentials from environment variables
+    # Get credentials from environment variables (or the token secret file)
     email = os.getenv('GOOGLE_EMAIL')
-    master_token = os.getenv('GOOGLE_MASTER_TOKEN')
-    
+    master_token = _read_master_token()
+
     if not email or not master_token:
-        raise ValueError("Missing Google Keep credentials. Please set GOOGLE_EMAIL and GOOGLE_MASTER_TOKEN environment variables.")
+        raise ValueError(
+            "Missing Google Keep credentials. Please set GOOGLE_EMAIL and "
+            "GOOGLE_MASTER_TOKEN (or GOOGLE_MASTER_TOKEN_FILE pointing to a "
+            "file containing the token)."
+        )
     
     # Initialize the Keep API
     keep = gkeepapi.Keep()

@@ -37,3 +37,43 @@ jobs:
 
       - name: Bytecode sanity
         run: python -m compileall src
+
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate the Compose file
+        run: |
+          GOOGLE_EMAIL=ci@example.com TOKEN_FILE_HOST=/tmp/ci-token \
+            docker compose config --quiet
+
+      - name: Build Docker image
+        run: docker build -t keep-mcp .
+
+      - name: Verify the image runs as a non-root user
+        run: |
+          uid="$(docker run --rm keep-mcp id -u)"
+          echo "container uid: $uid"
+          test "$uid" != "0"
+
+      - name: Smoke test the stdio transport
+        # The server authenticates lazily per tool call, so the MCP
+        # initialize handshake must succeed even without credentials.
+        run: |
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci-smoke","version":"0"}}}' \
+            | docker run --rm -i keep-mcp > /tmp/mcp-init.json
+          python3 - <<'EOF'
+          import json
+
+          with open("/tmp/mcp-init.json") as handle:
+              response = json.load(handle)
+
+          assert response.get("id") == 1, response
+          assert "result" in response, response
+          server_info = response["result"]["serverInfo"]
+          assert server_info["name"] == "keep", server_info
+          print(f"stdio smoke test passed against server {server_info['name']!r}")
+          EOF
