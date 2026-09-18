@@ -96,6 +96,13 @@ fi
 SECRET_NAME="${SECRET_NAME:-google_master_token}"
 IMAGE="${IMAGE:-keep-mcp:latest}"
 
+# Preflight: the image must be built locally first.
+if ! podman image exists "$IMAGE" >/dev/null 2>&1; then
+  echo "error: container image '$IMAGE' not found locally." >&2
+  echo "Build it first from the repo root: podman build -t $IMAGE ." >&2
+  exit 1
+fi
+
 export BWS_ACCESS_TOKEN
 
 # Refresh the secret on every start so rotation in Bitwarden takes effect here.
