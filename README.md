@@ -105,6 +105,8 @@ bw get password "google-master-token" | podman secret create google_master_token
 podman run --rm -i --secret google_master_token -e GOOGLE_EMAIL=you@example.com keep-mcp
 ```
 
+`scripts/run-with-bitwarden.sh` automates this: it refreshes the Podman secret from Bitwarden Secrets Manager on every invocation and then starts the container — see the script header for usage. Extra arguments are passed through to `podman run`, so it works for stdio launches today and daemon mode (`-d -p ...`) once a network transport exists.
+
 The `bw` CLI needs your vault unlocked, so for unattended starts (e.g. a systemd unit at boot) use **Bitwarden Secrets Manager** (`bws`) instead — it's built for machine-to-machine access via a service-account token:
 
 ```ini
