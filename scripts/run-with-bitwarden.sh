@@ -50,6 +50,21 @@ need podman
 need bws
 need jq
 
+# Preflight: fail fast with a useful message if podman itself can't start.
+# Without this, a broken rootless setup only surfaces later as a cryptic
+# `jq: Broken pipe` when the `podman secret create` pipeline collapses.
+if ! podman info >/dev/null 2>&1; then
+  cat >&2 <<EOF
+error: 'podman info' failed — podman isn't usable for user '$USER' on this machine.
+The usual cause is missing subordinate UID/GID ranges (newuidmap: Operation not permitted):
+  check: grep -E '^$USER:' /etc/subuid /etc/subgid
+  fix (as root): usermod --add-subuids 100000-165535 --add-subgids 100000-165535 $USER
+Inside a Proxmox LXC container you may also need 'features: nesting=1' and
+idmap entries for the subuid range in the container config on the Proxmox host.
+EOF
+  exit 1
+fi
+
 # Load the repo's .env file for anything not already exported, so GOOGLE_EMAIL
 # and BWS_SECRET_ID can live in the same .env the compose flow uses.
 # Explicitly exported variables always win over the file.
