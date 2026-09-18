@@ -52,7 +52,7 @@ Or with `uvx`:
 
 The recommended way to run the container is with Docker Compose.
 
-One-time setup — store the token in a user-owned file with owner-only permissions. `/run` does not exist on macOS and is usually not writable by a regular Linux user, so the token is bind-mounted into the container rather than passed as an environment variable:
+One-time setup — store the token in a user-owned file with owner-only permissions. `/run` does not exist on macOS and is usually not writable by a regular Linux user, so the token is provided as a Compose secret (mounted read-only inside the container) rather than passed as an environment variable:
 
 ```bash
 mkdir -p "$HOME/.config/keep-mcp"
@@ -78,14 +78,13 @@ Then point your MCP client at Compose. The client spawns a fresh container per s
 }
 ```
 
-(Use absolute paths — `~` is not expanded here. `TOKEN_FILE_HOST` is the token file on your machine; inside the container it is mounted read-only at `/run/secrets/google_master_token`, which the server reads because `GOOGLE_MASTER_TOKEN_FILE` points there. To use a different in-container path, change `GOOGLE_MASTER_TOKEN_FILE` under `environment:` and the bind `target:` to match.)
+(Use an absolute path for `TOKEN_FILE_HOST` — `~` is not expanded. Compose mounts it read-only at `/run/secrets/google_master_token`, which the server reads by default. To use a different in-container path, change the secret's `target:` and set `GOOGLE_MASTER_TOKEN_FILE` under `environment:` to match.)
 
-Or run it by hand:
+Or run it by hand — put the settings in a `.env` file next to `docker-compose.yml` (see `.env.example`); Compose picks it up automatically:
 
 ```bash
 cd /path/to/keep-mcp
-export GOOGLE_EMAIL=you@example.com
-export TOKEN_FILE_HOST="$HOME/.config/keep-mcp/google_master_token"
+cp .env.example .env  # then edit .env with your email and token file path
 docker compose run --rm keep-mcp
 ```
 
@@ -95,39 +94,7 @@ The server reads the token file first and falls back to the `GOOGLE_MASTER_TOKEN
 
 #### Bitwarden secret management
 
-If you keep the master token in Bitwarden, the cleanest hand-off is a **Podman secret**: it is mounted at `/run/secrets/<name>` inside the container, which matches the server's default `GOOGLE_MASTER_TOKEN_FILE` (`/run/secrets/google_master_token`) — no extra configuration needed.
-
-```bash
-# One-time: pull the token from Bitwarden into podman's secret store
-bw get password "google-master-token" | podman secret create google_master_token -
-
-# Run (or add --secret google_master_token to your quadlet .container file)
-podman run --rm -i --secret google_master_token -e GOOGLE_EMAIL=you@example.com keep-mcp
-```
-
-`scripts/run-with-bitwarden.sh` automates this: it refreshes the Podman secret from Bitwarden Secrets Manager on every invocation and then starts the container — see the script header for usage. Extra arguments are passed through to `podman run`, so it works for stdio launches today and daemon mode (`-d -p ...`) once a network transport exists.
-
-The `bw` CLI needs your vault unlocked, so for unattended starts (e.g. a systemd unit at boot) use **Bitwarden Secrets Manager** (`bws`) instead — it's built for machine-to-machine access via a service-account token:
-
-```ini
-# ~/.config/systemd/user/keep-mcp.service
-[Service]
-EnvironmentFile=%h/.config/keep-mcp/bws.env   # contains BWS_ACCESS_TOKEN=..., chmod 600
-# Refresh the podman secret from Bitwarden before each start.
-# The leading "-" ignores the error when the secret doesn't exist yet.
-ExecStartPre=-/usr/bin/podman secret rm google_master_token
-ExecStartPre=/usr/bin/bash -c 'bws secret get <secret-id> | jq -r ".value // ." | podman secret create google_master_token -'
-ExecStart=/usr/bin/podman run --rm -i --name keep-mcp --secret google_master_token -e GOOGLE_EMAIL=you@example.com keep-mcp
-```
-
-Then `systemctl --user daemon-reload && systemctl --user enable --now keep-mcp.service` (plus `loginctl enable-linger $USER` if it should start at boot without a login session).
-
-With plain Docker instead of Podman, the simplest equivalent is passing the token straight from `bw` as an environment variable — the server falls back to `GOOGLE_MASTER_TOKEN` when no token file is present:
-
-```bash
-GOOGLE_MASTER_TOKEN=$(bw get password "google-master-token") \
-  docker run --rm -i -e GOOGLE_MASTER_TOKEN -e GOOGLE_EMAIL=you@example.com keep-mcp
-```
+If you manage the master token in Bitwarden, `scripts/run-with-bitwarden.sh` is one way to wire it up: it refreshes a Podman secret from Bitwarden Secrets Manager on every invocation and then starts the container, so the token never touches disk. See the script header for setup and usage.
 
 #### Plain `docker run` (without Compose)
 
