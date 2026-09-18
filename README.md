@@ -94,7 +94,7 @@ The server reads the token file first and falls back to the `GOOGLE_MASTER_TOKEN
 
 #### Bitwarden secret management
 
-If you manage the master token in Bitwarden, `scripts/run-with-bitwarden.sh` is one way to wire it up: it refreshes a Podman secret from Bitwarden Secrets Manager on every invocation and then starts the container, so the token never touches disk. See the script header for setup and usage.
+If you manage the master token in Bitwarden, use `scripts/run-with-bitwarden.sh` **instead of** `docker compose`: the script pulls the token from Bitwarden Secrets Manager into a Podman secret on every invocation and then starts the container itself with `podman run`, so the token never touches disk. (The Compose flow above needs `TOKEN_FILE_HOST` and does not read from Bitwarden, so don't combine the two.) Requires Podman — there is no Docker equivalent of the script. See the script header for setup and usage.
 
 #### Plain `docker run` (without Compose)
 
