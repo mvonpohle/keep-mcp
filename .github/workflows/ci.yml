@@ -45,6 +45,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate the Compose file
+        run: |
+          GOOGLE_EMAIL=ci@example.com TOKEN_FILE_HOST=/tmp/ci-token \
+            docker compose config --quiet
+
       - name: Build Docker image
         run: docker build -t keep-mcp .
 

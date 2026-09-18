@@ -1,0 +1,28 @@
+# Compose wrapper for the keep-mcp MCP server (stdio transport).
+#
+# The MCP client spawns a fresh container per session and talks to it over
+# stdin/stdout, so this service publishes no ports and never runs as a daemon.
+# The Google master token is bind-mounted read-only from a user-owned file on
+# the host (see TOKEN_FILE_HOST) rather than passed as an environment variable.
+#
+# Required environment (set in your shell or your MCP client config):
+#   GOOGLE_EMAIL     - your Google account email
+#   TOKEN_FILE_HOST  - absolute path to the file holding your master token,
+#                      e.g. $HOME/.config/keep-mcp/google_master_token (chmod 600)
+
+services:
+  keep-mcp:
+    build: .
+    image: keep-mcp:latest
+    # stdio transport: keep stdin open so the MCP client can talk to the server
+    stdin_open: true
+    environment:
+      GOOGLE_EMAIL: ${GOOGLE_EMAIL:?Set GOOGLE_EMAIL to your Google account email}
+      GOOGLE_MASTER_TOKEN_FILE: /run/secrets/google_master_token
+      # Set to "true" to allow modifying notes without the keep-mcp label
+      UNSAFE_MODE: ${UNSAFE_MODE:-false}
+    volumes:
+      - type: bind
+        source: ${TOKEN_FILE_HOST:?Set TOKEN_FILE_HOST to the absolute path of your master-token file}
+        target: /run/secrets/google_master_token
+        read_only: true
